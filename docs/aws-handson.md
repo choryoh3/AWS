@@ -85,12 +85,60 @@ aws configure set region ap-southeast-2
 
 ## 8. メール送信（SES）
 
-このアプリの認証コードは SES の SMTP で送る（`SMTP_HOST=email-smtp.<リージョン>.amazonaws.com`、587 番）。SES は対応サービスに含まれる。ただし、**Deliverability dashboard は非対応**。
+このアプリの認証コードは SES の SMTP で送る（`SMTP_HOST=email-smtp.<リージョン>.amazonaws.com`、587 番）。SES は対応サービスに含まれる。ただし、**Deliverability dashboard（Virtual Deliverability Manager のダッシュボード）は非対応**（影響は 8.1 を参照）。
 
-1. SES で送信元のメールアドレス（または独自ドメイン）を **検証** する。リージョンはプロジェクトのリージョン（例: ap-southeast-2）に合わせる。
+1. SES で送信元のメールアドレス（または独自ドメイン）を **検証** する。リージョンはプロジェクトのリージョン（例: ap-southeast-2）に合わせる。本番に出た後も、送信元（From）に使うアドレスは検証が必要。
 2. 「SMTP 設定」で SMTP 認証情報を作る。**秘密情報。** Git や環境変数の平文欄には入れず、Secrets Manager か Amplify のシークレットに置く。
-3. SES の送信制限（サンドボックス）の扱いは、SES のドキュメントで確認する（検証済みの宛先にしか送れない状態が既定）。
-4. 送信テスト後、受信箱（迷惑メールも含む）で確認する。
+3. 送信テスト後、受信箱（迷惑メールも含む）で確認する。
+4. **サンドボックスを解除する**（8.2 の手順）。解除するまでは、検証済みの宛先にしか送れない。
+
+### 8.1 Deliverability dashboard が使えないことの影響
+
+- 公式ページ（SES deliverability）では、ダッシュボードは VDM を有効にして初めて使える機能で、ISP 別の配信データと、DNS 設定の推奨（Advisor）を見られる。**この環境では、その画面は使えない。**
+- このアプリの送信量は少なく（ログイン 1 回につき 1 通）、認証コードは受信者が待っているメールなので、**ダッシュボードが無くても送信そのものは問題なく行える。**
+- 代わりに次で補う。
+  - 送信元ドメインの DKIM を検証し、SPF・DMARC を DNS に設定する（迷惑メール判定を減らすため。設定の仕方は SES の「Authenticate email」の手順に従う）。
+  - バウンス・苦情の通知を、SNS や Event publishing で受け取る（届かないメールの原因を把握するため）。配信統計（Sending statistics）は、非対応の一覧に載っていないが、利用可否は画面で確認する。
+- 本格的な配信分析が必要になった段階で、通常版（advanced）の利用や VDM の利用可否を検討する。
+
+### 8.2 サンドボックスを解除する手順（公式ページに基づく）
+
+公式ページ「Request production access (Moving out of the Amazon SES sandbox)」の手順。
+
+**サンドボックスの制限**（解除前）
+
+- 検証済みのメールアドレス・ドメイン、または SES のメールボックスシミュレーターにしか送れない。
+- 1 日あたり最大 200 通、1 秒あたり最大 1 通。
+- サンドボックスの状態はリージョンごとに決まる。
+
+**手順（コンソール）**
+
+1. SES コンソール（https://console.aws.amazon.com/ses/）を開き、**Account dashboard** を選ぶ。
+2. 画面上部の「Your Amazon SES account is in the sandbox」の警告で、**View Get set up page** → **Request production access** を選ぶ。
+3. 次の項目を入力する。
+   - メールの種類: このアプリは **Transactional**（1 対 1 で、ユーザーの操作に応じて送るメール）
+   - Website URL: アプリの URL（まだ無ければ、その旨を書く）
+   - Additional contacts: 通知を受け取るメールアドレス（カンマ区切りで最大 4 件）
+   - Preferred contact language: English または Japanese
+   - Acknowledgement: 「明示的に依頼した人にだけ送る」「バウンス・苦情の処理の仕組みがある」の確認にチェック
+4. **Submit request** を押す。審査中は、アカウントの詳細を編集できない。
+
+**手順（CLI）**
+
+```bash
+aws sesv2 put-account-details \
+  --production-access-enabled \
+  --mail-type TRANSACTIONAL \
+  --website-url https://example.com \
+  --additional-contact-email-addresses info@example.com \
+  --contact-language JA
+```
+
+**審査**
+
+- AWS Support が 96 時間以内に最初の回答をする。情報が足りない場合は、さらに時間がかかる。
+- 送信元ドメインを先に検証しておくと、審査が早く進みやすい（公式の推奨）。
+- 承認されると、検証されていない宛先にも送れるようになる。ただし、From に使うアドレスは引き続き検証が必要。
 
 ## 9. アプリを公開する（最初の 1 回）
 
@@ -112,5 +160,5 @@ aws configure set region ap-southeast-2
 ## 残っている確認事項
 
 1. MFA の登録手順の細部（AWS Settings の画面）
-2. SES の送信制限（サンドボックス）の解除手順（SES のドキュメント）
-3. 日本の連絡先から割り当てられるリージョン（AWS Settings で確認）
+2. 日本の連絡先から割り当てられるリージョン（AWS Settings で確認）
+3. 配信統計（Sending statistics）と、バウンス・苦情の通知が簡易版で使えるかの確認（コンソールで確認）
