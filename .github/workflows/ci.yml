@@ -1,0 +1,66 @@
+# CI（継続的インテグレーション）。プルリクエストと main への push で、型・Lint・テスト・ビルドを確認する。
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    # テストとビルドで使う PostgreSQL（CI 専用の接続先。本番の値は含めない）。
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: app
+          POSTGRES_PASSWORD: app
+          POSTGRES_DB: app
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U app"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    # ビルド時に環境変数の検証が走るため、CI 専用のダミー値を入れる。
+    # 実際の秘密の値は GitHub の Secrets に置き、ここには書かない。
+    env:
+      DATABASE_URL: postgres://app:app@localhost:5432/app
+      BETTER_AUTH_SECRET: ci-only-dummy-secret-value-at-least-32-chars
+      BETTER_AUTH_URL: http://localhost:3000
+      SMTP_HOST: localhost
+      SMTP_PORT: "1025"
+      MAIL_FROM: "Login <no-reply@example.com>"
+
+    steps:
+      - name: リポジトリを取得
+        uses: actions/checkout@v4
+
+      - name: pnpm を準備（バージョンは package.json の packageManager に従う）
+        uses: pnpm/action-setup@v4
+
+      - name: Node.js を準備
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: 依存関係をインストール（ロックファイルどおり）
+        run: pnpm install --frozen-lockfile
+
+      - name: 型チェック
+        run: pnpm typecheck
+
+      - name: 静的検査（ESLint）
+        run: pnpm lint
+
+      - name: テスト（Vitest）
+        run: pnpm test
+
+      - name: ビルド（Next.js）
+        run: pnpm build

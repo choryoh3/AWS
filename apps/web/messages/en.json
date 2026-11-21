@@ -1,0 +1,49 @@
+{
+  "login": {
+    "title": "Sign in",
+    "description": "Sign in with the verification code sent to your email.",
+    "steps": {
+      "email": "Email",
+      "otp": "Code",
+      "result": "Result"
+    },
+    "email": {
+      "label": "Email address",
+      "placeholder": "you@example.com",
+      "submit": "Send verification code"
+    },
+    "otp": {
+      "description": "Enter the 6-digit code sent to {email}.",
+      "label": "Verification code",
+      "submit": "Sign in",
+      "resend": "Resend code",
+      "changeEmail": "Change email address",
+      "sent": "We sent a verification code."
+    },
+    "ok": {
+      "title": "Signed in",
+      "description": "You are signed in as {email}.",
+      "logout": "Sign out"
+    },
+    "ng": {
+      "title": "Sign-in failed",
+      "reasons": {
+        "INVALID_OTP": "The verification code is incorrect. Re-enter the code or start over.",
+        "OTP_EXPIRED": "The verification code has expired. Please start over.",
+        "TOO_MANY_ATTEMPTS": "Too many attempts. Please start over.",
+        "UNKNOWN": "We could not sign you in. Please try again later."
+      },
+      "retry": "Start over",
+      "retryCode": "Re-enter code"
+    },
+    "errors": {
+      "invalidEmail": "Please enter a valid email address.",
+      "invalidOtp": "The verification code is incorrect.",
+      "otpExpired": "The verification code has expired. Please resend it.",
+      "tooManyAttempts": "Too many attempts. Please resend the code.",
+      "otpFormat": "Please enter the 6-digit number.",
+      "sendFailed": "We could not send the code. Please try again later.",
+      "unknown": "An unexpected error occurred."
+    }
+  }
+}
