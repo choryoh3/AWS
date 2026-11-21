@@ -36,15 +36,20 @@
 
 ```
 VPC: login-app-vpc（例: 10.0.0.0/16）
-├─ AZ-a
+├─ AZ-a（ここにすべてのサーバーを置く）
 │   ├─ public-a   10.0.1.0/24   … 踏み台 EC2 を置く（インターネットへの経路あり）
 │   └─ private-a  10.0.11.0/24  … RDS を置く（インターネットへの経路なし）
-└─ AZ-b
-    ├─ public-b   10.0.2.0/24   （予備。学習では空でよい）
-    └─ private-b  10.0.12.0/24  … RDS の要件（2 つの AZ に置くサブネットが必要）
+└─ AZ-b（DB サブネットグループの要件を満たすためだけに作る。中身は空）
+    └─ private-b  10.0.12.0/24  … RDS は置かない。サブネットグループの条件用
 ```
 
-**なぜ 2 つの AZ か**: RDS のサブネットグループは、**2 つ以上の AZ** にあるサブネットを要求します。後から Multi-AZ（冗長化）に変えるときも、このままで対応できます。
+**AZ-a だけでは RDS は作れません（公式の要件）。** RDS のサブネットグループは、**少なくとも 2 つの AZ にそれぞれサブネットがある**ことを要求します（公式ページ「Working with DB subnet groups」）。そのため、次のように割り切ります。
+
+- サーバー（踏み台）と DB の本体は **AZ-a** だけに置く。
+- **AZ-b の private-b は「空の要件用サブネット」として 1 つだけ作る。** 料金はかからず、RDS も置かない。
+- public-b は作らない（使わないため）。
+
+**なぜこの割り切りか**: 学習の目的は「VPC・踏み台・DB の関係」を理解することです。冗長化（片方の AZ が止まっても動く構成）は、本番で検討すれば十分です。
 
 **なぜ CIDR が `10.0.0.0/16` か**: 家庭のネットワークの `192.168.x.x` と重ならない範囲を選ぶ。将来、他の VPC とつなぐときに重なると困るため。
 
@@ -57,9 +62,9 @@ VPC: login-app-vpc（例: 10.0.0.0/16）
 3. 次のように入力する。
    - Name tag auto-generation: `login-app`（タグの接頭語になる）
    - IPv4 CIDR: `10.0.0.0/16`
-   - Number of Availability Zones: **2**
-   - Number of public subnets: **2**
-   - Number of private subnets: **2**
+   - Number of Availability Zones: **2**（DB サブネットグループの要件のため）
+   - Number of public subnets: **1**（AZ-a に作られる。踏み台用）
+   - Number of private subnets: **2**（AZ-a の DB 用と、AZ-b の要件用）
    - NAT gateways: **None（なし）**（**重要**: NAT Gateway は時間あたりの料金が高く、学習では不要）
    - VPC endpoints: **None**（学習では不要）
    - DNS hostnames: **有効**（オン）
@@ -147,7 +152,7 @@ RDS を作るときに、「どのサブネットに置いてよいか」を決�
 
 - **RDS → Subnet groups → Create DB subnet group**。
 - 名前: `db-subnets`、VPC: `login-app-vpc`。
-- 追加するサブネット: **private-a と private-b**（2 つの AZ）。
+- 追加するサブネット: **private-a と private-b**（2 つの AZ。private-b は空のままでよい）。
 
 **なぜ**: 後で RDS を作るとき、この一覧の中からだけ選べるようにするため。公開したくない DB を、うっかり公開サブネットに置かないための仕組みです。
 
