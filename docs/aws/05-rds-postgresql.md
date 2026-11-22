@@ -45,7 +45,7 @@ PostgreSQL を EC2 に自分で入れることもできますが、次のよう�
 [VPC] login-app-vpc
    ├─ public-a：EC2 踏み台（sg-bastion）
    │        │ 5432（sg-db は sg-bastion からだけ許可）
-   └─ private-a / private-b：RDS（sg-db）
+   └─ private-a：RDS（sg-db）　※ private-b は、サブネットグループの要件のための空のサブネット
 ```
 
 - **DB を非公開に置く**: 外から攻撃されない。
