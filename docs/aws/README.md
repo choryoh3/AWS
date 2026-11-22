@@ -11,6 +11,57 @@
 > - 書いてある金額は目安です。料金は必ず **請求の画面** で確認してください。
 > - 手順の多くは「コンソール（ブラウザの画面）」の操作と、同じことを行う「CLI（ターミナルのコマンド）」の両方を載せています。
 
+## アーキテクチャ図（学習構成）
+
+最終的に作る構成です。点線は「まだ確認が必要な接続」を表します。
+
+```mermaid
+flowchart LR
+  user["ユーザーのブラウザ"]
+
+  subgraph AMP["Amplify Hosting（Next.js アプリ）"]
+    app["login-app<br/>（環境変数・シークレットを設定）"]
+  end
+
+  subgraph SES["SES（メール送信）ap-southeast-2"]
+    ses["検証済みドメイン<br/>DKIM / SPF / DMARC<br/>SMTP 587（STARTTLS）"]
+  end
+
+  subgraph AWS["AWS アカウント（プロジェクト）"]
+    budget["利用上限（spend limit）<br/>Budgets（通知）"]
+    s3["S3（ファイル保存・任意）<br/>パブリック公開は遮断"]
+
+    subgraph VPC["VPC: login-app-vpc 10.0.0.0/16"]
+      subgraph AZA["AZ-a"]
+        subgraph PUB["public-a 10.0.1.0/24"]
+          bastion["EC2 踏み台<br/>sg-bastion（インバウンドなし）"]
+        end
+        subgraph PRIVA["private-a 10.0.11.0/24（インターネット経路なし）"]
+          rds[("RDS for PostgreSQL 16<br/>sg-db: 5432 は sg-bastion から")]
+        end
+      end
+      subgraph AZB["AZ-b"]
+        privb["private-b 10.0.12.0/24<br/>（空。DB サブネットグループの要件用）"]
+      end
+    end
+  end
+
+  user -->|"https"| app
+  app -.->|"① 認証コードのメール送信<br/>（SMTP 587）"| ses
+  app -.->|"② DB 接続（要確認）"| rds
+  ses -->|"認証コードのメール"| user
+  admin["管理者の PC"] -->|"SSM Session Manager<br/>（ポートを開けない）"| bastion
+  bastion -->|"5432（psql / ポート転送）"| rds
+  budget -.-> AWS
+```
+
+**図の読み方**
+
+- **インターネットから直接届くのは、Amplify（アプリ）だけ**です。DB（RDS）はインターネットから届かない場所（private-a）に置きます。
+- **管理者は、SSM Session Manager で踏み台に入ります。** SSH のポートは開けません。踏み台から DB へ、5432 番だけ通します。
+- **AZ-b の private-b は、RDS の要件を満たすための空のサブネット**です。DB は置きません。
+- **利用上限と予算**は、構成の外側で費用を監視します。
+
 ## 読む順番
 
 | 順番 | ファイル                                           | 中身                                                      | 最初にやる理由                                     |
